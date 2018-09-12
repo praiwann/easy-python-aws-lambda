@@ -1,0 +1,26 @@
+version: '3.4'
+services:
+
+  test:
+    image: lambci/lambda:python3.6
+    volumes:
+    - .:/var/task
+    - $PWD/tmp:/var/task
+    - $PWD/lambda/$FUNCTION_FOLDER:/var/task
+    command: ls -lh
+    entrypoint: /bin/bash -c
+
+  build:
+    build:
+      context: ./
+      dockerfile: Dockerfile
+    volumes:
+    - $PWD/lambda/$FUNCTION_FOLDER:/var/task
+    container_name: $LAMBDA_MODULE
+    environment:
+    - AWS_ACCOUNT_ID=$AWS_ACCOUNT_ID
+    - AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+    - AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+    - AWS_REGION=$AWS_REGION
+    - EXE_MODULE=$LAMBDA_MODULE
+    - FUNCTION_NAME=$LAMBDA_FUNCTION_NAME

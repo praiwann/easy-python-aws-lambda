@@ -5,7 +5,7 @@ References repo -> [docker-lambda][4] by lambci, [python-amazonlinux][5] by Real
 This Python repo will help you to develop, test (on virtual AWS Lambda via docker) and build/deploy to AWS Lambda easily.
 
 ### Prerequisites
-- **Working on Max OS X only.**
+- **Working on Max OSX only.**
 - Minimum 4GB disk space required (reserved for docker images).
 - Python version 3.6 (manage python version very very easy by using [pyenv]).
 - Python Virtualenv either use [virtualenv][0] or [pyenv-virtualenv][1].
@@ -32,7 +32,7 @@ python run.py
 
 You will see 3 options available if pass python and virtualenv prerequisite checked.
 
-1. Install all python dependencies which defined in each lambda function folder (by using requirements.txt)
+1. Install all python dependencies to your virtualenv for development process (better for working with IDE Autocomplete) which defined in each lambda function folder (by using requirements.txt)
 2. Run test function on AWS Lambda environment (operate by docker). When you run this option, event.json will be inject for testing the handler.
 3. Build and deploy to AWS Lambda. **S3 Bucket is need**, the script will upload the zip file to S3 (named s3://<bucket-name>/lambda/<function-name>-\<timestamp>.zip) and lambda will pull from it to replace function. Also please make sure **_all of your python dependencies should not produce a very large zip file_** because of the limit of Lambda for Compress package is just 50MB. See details [AWS Lambda Limit][6]
 

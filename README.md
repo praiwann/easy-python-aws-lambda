@@ -1,8 +1,10 @@
+### Easy Python AWS Lambda
+
 References repo -> [docker-lambda][4] by lambci, [python-amazonlinux][5] by RealSalmon.
 
 This Python repo will help you to develop, test (on virtual AWS Lambda via docker) and build/deploy to AWS Lambda easily.
 
-###Prerequisites
+### Prerequisites
 - **Working on Max OS X only.**
 - Minimum 4GB disk space required (reserved for docker images).
 - Python version 3.6 (manage python version very very easy by using [pyenv]).
@@ -11,12 +13,12 @@ This Python repo will help you to develop, test (on virtual AWS Lambda via docke
 - AWS IAM with Lambda & S3 Roles apply (AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY are required).
 - Indeed!!, some Python knowledge.
 
-###Setup
+### Setup
 - Checks and satisfied prerequisites.
 - Activated virtualenv for this repo (on local) follow these step -> [virtualenv][2] or [pyenv-virtualenv][3] (depend on virtualenv management you use).
 - Let's Rock!!
 
-###Get started...
+### Get started...
 Please see /lambda/example directory for an example usage.
 
 You can create new directory beneath /lambda for any lambda module. All dir will have their own python dependencies (list by requirements.txt and **can't use a specific version** for now).

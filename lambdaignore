@@ -17,3 +17,4 @@ CODEOWNERS
 build*
 .gitignore
 lambda/*
+lambdaignore

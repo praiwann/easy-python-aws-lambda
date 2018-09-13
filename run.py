@@ -4,7 +4,28 @@ from pathlib import Path
 import os
 import sys
 import re
+import time
+import json
 import subprocess
+
+
+class AWSEnv:
+    AWS_ACCESS_KEY_ID = 'AWS_ACCESS_KEY_ID'
+    AWS_SECRET_ACCESS_KEY = 'AWS_SECRET_ACCESS_KEY'
+    AWS_ACCOUNT_ID = 'AWS_ACCOUNT_ID'
+    AWS_REGION = 'AWS_REGION'
+    AWS_S3_LAMBDA_BUCKET = 'AWS_S3_LAMBDA_BUCKET'
+
+
+class UserDefinedEnv:
+    FUNCTION_FOLDER = 'FUNCTION_FOLDER'
+    LAMBDA_MODULE = 'LAMBDA_MODULE'
+    LAMBDA_FUNCTION_NAME = 'LAMBDA_FUNCTION_NAME'
+
+
+class PrivateEnv:
+    TEST_EVENT = 'TEST_EVENT'
+    COMPRESS_FILE_NAME = 'COMPRESS_FILE_NAME'
 
 
 class BColors:
@@ -67,17 +88,24 @@ def _req_ver(_req, _in_use):
 
 
 def _check_aws_env():
-    l_envs = [('AWS_ACCESS_KEY_ID', os.getenv('AWS_ACCESS_KEY_ID')),
-              ('AWS_SECRET_ACCESS_KEY', os.getenv('AWS_SECRET_ACCESS_KEY')),
-              ('AWS_ACCOUNT_ID', os.getenv('AWS_ACCOUNT_ID')),
-              ('AWS_REGION', os.getenv('AWS_REGION'))]
+    l_envs = [(AWSEnv.AWS_ACCESS_KEY_ID, os.getenv(AWSEnv.AWS_ACCESS_KEY_ID)),
+              (AWSEnv.AWS_SECRET_ACCESS_KEY, os.getenv(AWSEnv.AWS_SECRET_ACCESS_KEY)),
+              (AWSEnv.AWS_ACCOUNT_ID, os.getenv(AWSEnv.AWS_ACCOUNT_ID)),
+              (AWSEnv.AWS_REGION, os.getenv(AWSEnv.AWS_REGION)),
+              (AWSEnv.AWS_S3_LAMBDA_BUCKET, os.getenv(AWSEnv.AWS_S3_LAMBDA_BUCKET))]
 
+    is_set = True
     print('')
     for l_env in l_envs:
+        if not l_env[1]:
+            is_set = False
+
         print('{}... '.format(l_env[0]), end='')
         _req_success() if l_env[1] else _req_fail()
 
     print('')
+
+    return is_set
 
 
 def _req_fail():
@@ -130,7 +158,7 @@ def mk_dir():
 
 def cp_lfunc():
     op_print('Copy specify lambda function to temp folder')
-    l_folder = sys_env.get('FUNCTION_FOLDER')
+    l_folder = sys_env.get(UserDefinedEnv.FUNCTION_FOLDER)
     if not l_folder:
         raise EnvironmentError('No lambda function specify')
 
@@ -138,6 +166,34 @@ def cp_lfunc():
     subprocess.Popen(['cp -a {}/lambda/{}/. tmp/'.format(os.getcwd(), l_folder)],
                      stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True, env=sys_env).communicate()
     op_print('Done copy lambda function')
+
+
+def cp_ignore():
+    op_print('Copy lambdaignore to temp folder')
+    op_print('Copying...')
+    subprocess.Popen(['cp -a lambdaignore tmp/'.format(os.getcwd())],
+                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True, env=sys_env).communicate()
+    op_print('Done copy ignore list')
+
+
+def read_test_event():
+    folder = sys_env.get(UserDefinedEnv.FUNCTION_FOLDER)
+    if not folder:
+        return
+
+    op_print('Read test event file if exist...')
+    event_path = '{}/lambda/{}/event.json'.format(os.getcwd(), folder)
+
+    json_data = None
+    if Path(event_path).exists():
+        with open(event_path, encoding='utf-8') as event_file:
+            json_data = event_file.read()
+
+    if json_data:
+        try:
+            sys_env[PrivateEnv.TEST_EVENT] = '\'{}\''.format(json.dumps(json.loads(json_data)))
+        except Exception as e:
+            print(w_color('Contents error in event.json format', BColors.WARNING))
 
 
 def user_input_env(is_build=False):
@@ -158,7 +214,7 @@ def user_input_env(is_build=False):
             l_folder = l_folder_raw
 
         full_path = '{}/lambda/{}'.format(os.getcwd(), l_folder)
-        if Path(full_path).exists() and Path(full_path).is_dir():
+        if l_folder and Path(full_path).exists() and Path(full_path).is_dir():
             break
 
         print('No path found!!, don\'t troll me!!')
@@ -168,8 +224,8 @@ def user_input_env(is_build=False):
         print('No input provided for lambda module... use default(lambda_function.lambda_handler)')
         l_module = 'lambda_function.lambda_handler'
 
-    set_env('LAMBDA_MODULE', l_module)
-    set_env('FUNCTION_FOLDER', l_folder)
+    set_env(UserDefinedEnv.LAMBDA_MODULE, l_module)
+    set_env(UserDefinedEnv.FUNCTION_FOLDER, l_folder)
 
     if is_build:
         while True:
@@ -179,7 +235,7 @@ def user_input_env(is_build=False):
 
             print('No default for this ENV!! don\'t you know lambda function?!!')
 
-        set_env('LAMBDA_FUNCTION_NAME', l_fname)
+        set_env(UserDefinedEnv.LAMBDA_FUNCTION_NAME, l_fname)
 
 
 def op_docker_down():
@@ -202,6 +258,7 @@ def op_install_local():
                 e_reqs = req.read().splitlines()
                 reqs.extend(e_reqs)
 
+    reqs = list(set(reqs))
     if len(reqs):
         op_print('Install all dependencies for local development...')
         p = subprocess.Popen(['pip install --upgrade {}'.format(' '.join(reqs))], stdout=subprocess.PIPE,
@@ -214,7 +271,9 @@ def op_install_local():
 
 def op_test():
     run_w_rollback(user_input_env)
+    run_w_rollback(mk_dir)
     run_w_rollback(cp_lfunc)
+    run_w_rollback(read_test_event)
 
     try:
         op_print('Run dependencies installer...')
@@ -235,10 +294,20 @@ def op_test():
 
 
 def op_build():
+    if not _check_aws_env():
+        print(w_color('Some required ENV not set in bash_profile or local environment, please check', BColors.FAIL))
+        return
+
     run_w_rollback(user_input_env, is_build=True)
+    run_w_rollback(mk_dir)
     run_w_rollback(cp_lfunc)
+    run_w_rollback(cp_ignore)
 
     try:
+        ts = int(time.time())
+        file_name = sys_env[UserDefinedEnv.LAMBDA_FUNCTION_NAME] + '_' + str(ts)
+        sys_env[PrivateEnv.COMPRESS_FILE_NAME] = file_name
+
         op_print('Run dependencies installer...')
         p = subprocess.Popen(['docker-compose up install'], stdout=subprocess.PIPE,
                              stderr=subprocess.STDOUT, shell=True, env=sys_env)

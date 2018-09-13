@@ -7,3 +7,4 @@ logger.setLevel(logging.INFO)
 
 def lambda_handler(event, context):
     logger.info("Yeah!! its working")
+    logger.info(event)

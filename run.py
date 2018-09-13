@@ -61,9 +61,26 @@ def op_print_fail(phrase):
     print('{}{}'.format(w_color('Operation Fail: ', BColors.FAIL), phrase))
 
 
+def _req_fail():
+    print(w_color('Fail', BColors.FAIL))
+
+
+def _req_success():
+    print(w_color('Success', BColors.OKGREEN))
+
+
 def _is_venv():
     return (hasattr(sys, 'real_prefix') or
             (hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix))
+
+
+def _create_subprocess_popen(cmd):
+    return subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT, shell=True, env=sys_env)
+
+
+def _run_subprocess(cmd):
+    return _create_subprocess_popen(cmd).communicate()
 
 
 def _req_ver(_req, _in_use):
@@ -108,75 +125,60 @@ def _check_aws_env():
     return is_set
 
 
-def _req_fail():
-    print(w_color('Fail', BColors.FAIL))
-
-
-def _req_success():
-    print(w_color('Success', BColors.OKGREEN))
-
-
-def print_process(p):
+def _print_process(p):
     for line in iter(p.stdout.readline, b''):
         print(w_color('>>> ', BColors.BOLD) + line.rstrip().decode('utf-8'))
 
 
-def set_env(env_name, env_value):
+def _set_env(env_name, env_value):
     sys_env[env_name] = env_value
 
 
-def rollback():
+def _rollback():
     op_print('Rollback process...')
 
     op_print('Reset tmp folder')
-    subprocess.Popen(['rm -rf ./tmp && rm requirements.txt'], stdout=subprocess.PIPE,
-                     stderr=subprocess.STDOUT, shell=True, env=sys_env).communicate()
-
+    _run_subprocess('rm -rf ./tmp && rm requirements.txt')
     op_print('Done rollback ;)')
 
 
-def run_w_rollback(func, **kwargs):
+def _run_w_rollback(func, **kwargs):
     try:
         func(**kwargs)
     except Exception as e:
         op_print_fail(e.__str__())
-        rollback()
+        _rollback()
 
 
-def mk_dir():
+def _mk_dir():
     op_print('Initiated temporary folder...')
 
     if Path('{}/tmp'.format(os.getcwd())).exists() and Path('{}/tmp'.format(os.getcwd())).is_dir():
-        subprocess.Popen(['rm -rf ./tmp'], stdout=subprocess.PIPE,
-                         stderr=subprocess.STDOUT, shell=True, env=sys_env).communicate()
+        _run_subprocess('rm -rf ./tmp')
 
-    subprocess.Popen(['mkdir tmp'], stdout=subprocess.PIPE,
-                     stderr=subprocess.STDOUT, shell=True, env=sys_env).communicate()
-
+    _run_subprocess('mkdir tmp')
     op_print('Done create temporary folder')
 
 
-def cp_lfunc():
+def _cp_lfunc():
     op_print('Copy specify lambda function to temp folder')
     l_folder = sys_env.get(UserDefinedEnv.FUNCTION_FOLDER)
     if not l_folder:
         raise EnvironmentError('No lambda function specify')
 
     op_print('Copying...')
-    subprocess.Popen(['cp -a {}/lambda/{}/. tmp/'.format(os.getcwd(), l_folder)],
-                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True, env=sys_env).communicate()
+    _run_subprocess('cp -a {}/lambda/{}/. tmp/'.format(os.getcwd(), l_folder))
     op_print('Done copy lambda function')
 
 
-def cp_ignore():
+def _cp_ignore():
     op_print('Copy lambdaignore to temp folder')
     op_print('Copying...')
-    subprocess.Popen(['cp -a lambdaignore tmp/'.format(os.getcwd())],
-                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True, env=sys_env).communicate()
+    _run_subprocess('cp -a lambdaignore tmp/'.format(os.getcwd()))
     op_print('Done copy ignore list')
 
 
-def read_test_event():
+def _read_test_event():
     folder = sys_env.get(UserDefinedEnv.FUNCTION_FOLDER)
     if not folder:
         return
@@ -196,7 +198,7 @@ def read_test_event():
             print(w_color('Contents error in event.json format', BColors.WARNING))
 
 
-def user_input_env(is_build=False):
+def _user_input_env(is_build=False):
     sub_folders = [f.name for f in os.scandir('{}/lambda/'.format(os.getcwd())) if f.is_dir()]
 
     print(w_color('\nList all available function...\n', BColors.UNDERLINE))
@@ -224,8 +226,8 @@ def user_input_env(is_build=False):
         print('No input provided for lambda module... use default(lambda_function.lambda_handler)')
         l_module = 'lambda_function.lambda_handler'
 
-    set_env(UserDefinedEnv.LAMBDA_MODULE, l_module)
-    set_env(UserDefinedEnv.FUNCTION_FOLDER, l_folder)
+    _set_env(UserDefinedEnv.LAMBDA_MODULE, l_module)
+    _set_env(UserDefinedEnv.FUNCTION_FOLDER, l_folder)
 
     if is_build:
         while True:
@@ -235,18 +237,17 @@ def user_input_env(is_build=False):
 
             print('No default for this ENV!! don\'t you know lambda function?!!')
 
-        set_env(UserDefinedEnv.LAMBDA_FUNCTION_NAME, l_fname)
+        _set_env(UserDefinedEnv.LAMBDA_FUNCTION_NAME, l_fname)
 
 
-def op_docker_down():
+def _op_docker_down():
     op_print('Reset all docker-compose images')
-    p = subprocess.Popen(['docker-compose down --rmi all'], stdout=subprocess.PIPE,
-                         stderr=subprocess.STDOUT, shell=True, env=sys_env)
+    p = _create_subprocess_popen('docker-compose down --rmi all')
 
-    print_process(p)
+    _print_process(p)
 
 
-def op_install_local():
+def _op_install_local():
     op_print('Scan all requirements...')
     sub_folders = [f.name for f in os.scandir('{}/lambda/'.format(os.getcwd())) if f.is_dir()]
 
@@ -261,47 +262,44 @@ def op_install_local():
     reqs = list(set(reqs))
     if len(reqs):
         op_print('Install all dependencies for local development...')
-        p = subprocess.Popen(['pip install --upgrade {}'.format(' '.join(reqs))], stdout=subprocess.PIPE,
-                             stderr=subprocess.STDOUT, shell=True, env=sys_env)
+        p = _create_subprocess_popen('pip install --upgrade {}'.format(' '.join(reqs)))
 
-        print_process(p)
+        _print_process(p)
 
     op_print('Done install requirements...')
 
 
-def op_test():
-    run_w_rollback(user_input_env)
-    run_w_rollback(mk_dir)
-    run_w_rollback(cp_lfunc)
-    run_w_rollback(read_test_event)
+def _op_test():
+    _run_w_rollback(_user_input_env)
+    _run_w_rollback(_mk_dir)
+    _run_w_rollback(_cp_lfunc)
+    _run_w_rollback(_read_test_event)
 
     try:
         op_print('Run dependencies installer...')
-        p = subprocess.Popen(['docker-compose up install'], stdout=subprocess.PIPE,
-                             stderr=subprocess.STDOUT, shell=True, env=sys_env)
+        p = _create_subprocess_popen('docker-compose up install')
 
-        print_process(p)
+        _print_process(p)
 
         op_print('Run docker-lambda on test environment...')
-        p = subprocess.Popen(['docker-compose up test'], stdout=subprocess.PIPE,
-                             stderr=subprocess.STDOUT, shell=True, env=sys_env)
+        p = _create_subprocess_popen('docker-compose up test')
 
-        print_process(p)
+        _print_process(p)
 
     finally:
-        op_docker_down()
-        rollback()
+        _op_docker_down()
+        _rollback()
 
 
-def op_build():
+def _op_build():
     if not _check_aws_env():
         print(w_color('Some required ENV not set in bash_profile or local environment, please check', BColors.FAIL))
         return
 
-    run_w_rollback(user_input_env, is_build=True)
-    run_w_rollback(mk_dir)
-    run_w_rollback(cp_lfunc)
-    run_w_rollback(cp_ignore)
+    _run_w_rollback(_user_input_env, is_build=True)
+    _run_w_rollback(_mk_dir)
+    _run_w_rollback(_cp_lfunc)
+    _run_w_rollback(_cp_ignore)
 
     try:
         ts = int(time.time())
@@ -309,20 +307,18 @@ def op_build():
         sys_env[PrivateEnv.COMPRESS_FILE_NAME] = file_name
 
         op_print('Run dependencies installer...')
-        p = subprocess.Popen(['docker-compose up install'], stdout=subprocess.PIPE,
-                             stderr=subprocess.STDOUT, shell=True, env=sys_env)
+        p = _create_subprocess_popen('docker-compose up install')
 
-        print_process(p)
+        _print_process(p)
 
         op_print('Run docker-lambda build and deploy to AWS')
-        p = subprocess.Popen(['docker-compose up build'], stdout=subprocess.PIPE,
-                             stderr=subprocess.STDOUT, shell=True, env=sys_env)
+        p = _create_subprocess_popen('docker-compose up build')
 
-        print_process(p)
+        _print_process(p)
 
     finally:
-        op_docker_down()
-        rollback()
+        _op_docker_down()
+        _rollback()
 
 
 def run():
@@ -331,8 +327,7 @@ def run():
     pre_res = True
     for req in prerequisites:
         print('{}... '.format(req[0]), end='')
-        res_ver, err = subprocess.Popen(['{} --version'.format(req[0])], stdout=subprocess.PIPE,
-                                        stderr=subprocess.STDOUT, shell=True, env=sys_env).communicate()
+        res_ver, err = _run_subprocess('{} --version'.format(req[0]))
 
         res_ver = res_ver.decode('utf-8')
         if req[2] == 'regex':
@@ -391,11 +386,11 @@ def run():
     op_option = int(op_option)
 
     if op_option == 1:
-        op_install_local()
+        _op_install_local()
     elif op_option == 2:
-        op_test()
+        _op_test()
     elif op_option == 3:
-        op_build()
+        _op_build()
 
     print(w_color('\n####### End operation #######', BColors.HEADER))
 

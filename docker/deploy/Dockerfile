@@ -2,7 +2,7 @@ FROM lambci/lambda:build-python3.6
 
 ENV AWS_DEFAULT_REGION ap-southeast-1
 
-COPY . .
+COPY ../.. .
 
 CMD echo compressing package $PWD && \
     cat .lambdaignore | xargs zip -9qyr lambda.zip $PWD -x && \

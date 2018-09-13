@@ -16,6 +16,8 @@ class BColors:
     ENDC = '\033[0m'
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
+    LCYAN = '\033[1;36m'
+    ORANGE = '\033[0;33m'
 
 
 prerequisites = [(r'docker-compose', r'docker-compose version (.*),', r'regex', r'1.9'),
@@ -31,7 +33,7 @@ def w_color(phrase, bc):
 
 
 def op_print(phrase):
-    print('{}{}'.format(w_color('Operation: ', BColors.BOLD), phrase))
+    print('{}{}'.format(w_color('Operation: ', BColors.LCYAN), phrase))
 
 
 def op_print_fail(phrase):
@@ -64,6 +66,20 @@ def _req_ver(_req, _in_use):
     return res
 
 
+def _check_aws_env():
+    l_envs = [('AWS_ACCESS_KEY_ID', os.getenv('AWS_ACCESS_KEY_ID')),
+              ('AWS_SECRET_ACCESS_KEY', os.getenv('AWS_SECRET_ACCESS_KEY')),
+              ('AWS_ACCOUNT_ID', os.getenv('AWS_ACCOUNT_ID')),
+              ('AWS_REGION', os.getenv('AWS_REGION'))]
+
+    print('')
+    for l_env in l_envs:
+        print('{}... '.format(l_env[0]), end='')
+        _req_success() if l_env[1] else _req_fail()
+
+    print('')
+
+
 def _req_fail():
     print(w_color('Fail', BColors.FAIL))
 
@@ -77,24 +93,14 @@ def print_process(p):
         print(w_color('>>> ', BColors.BOLD) + line.rstrip().decode('utf-8'))
 
 
-def get_sitepackage_path(venv_path):
-    return '{}/lib/python3.6/site-packages'.format(venv_path)
-
-
 def set_env(env_name, env_value):
     sys_env[env_name] = env_value
-    # subprocess.Popen(['export {}={}'.format(env_name, env_value)], stdout=subprocess.PIPE,
-    #                  stderr=subprocess.STDOUT, shell=True).communicate()
-
-
-def unset_env(env_name):
-    subprocess.Popen(['unset {}'.format(env_name)], stdout=subprocess.PIPE,
-                     stderr=subprocess.STDOUT, shell=True, env=sys_env).communicate()
 
 
 def rollback():
     op_print('Rollback process...')
 
+    op_print('Reset tmp folder')
     subprocess.Popen(['rm -rf ./tmp && rm requirements.txt'], stdout=subprocess.PIPE,
                      stderr=subprocess.STDOUT, shell=True, env=sys_env).communicate()
 
@@ -109,22 +115,48 @@ def run_w_rollback(func, **kwargs):
         rollback()
 
 
-def cp_venv():
-    op_print('Copy python dependencies from venv for mount volume to docker')
-    venv_path = os.getenv('VIRTUAL_ENV')
-    if not venv_path:
-        raise EnvironmentError('No virtual environment active')
+def mk_dir():
+    op_print('Initiated temporary folder...')
 
-    print('VIRENV_PATH: {}'.format(venv_path))
-    op_print('Copying...')
-    subprocess.Popen(['mkdir tmp && cp -a {}/. tmp/'.format(get_sitepackage_path(venv_path))], stdout=subprocess.PIPE,
+    if Path('{}/tmp'.format(os.getcwd())).exists() and Path('{}/tmp'.format(os.getcwd())).is_dir():
+        subprocess.Popen(['rm -rf ./tmp'], stdout=subprocess.PIPE,
+                         stderr=subprocess.STDOUT, shell=True, env=sys_env).communicate()
+
+    subprocess.Popen(['mkdir tmp'], stdout=subprocess.PIPE,
                      stderr=subprocess.STDOUT, shell=True, env=sys_env).communicate()
-    op_print('Done copy site-packages')
+
+    op_print('Done create temporary folder')
+
+
+def cp_lfunc():
+    op_print('Copy specify lambda function to temp folder')
+    l_folder = sys_env.get('FUNCTION_FOLDER')
+    if not l_folder:
+        raise EnvironmentError('No lambda function specify')
+
+    op_print('Copying...')
+    subprocess.Popen(['cp -a {}/lambda/{}/. tmp/'.format(os.getcwd(), l_folder)],
+                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True, env=sys_env).communicate()
+    op_print('Done copy lambda function')
 
 
 def user_input_env(is_build=False):
+    sub_folders = [f.name for f in os.scandir('{}/lambda/'.format(os.getcwd())) if f.is_dir()]
+
+    print(w_color('\nList all available function...\n', BColors.UNDERLINE))
+    [print('{} {}'.format(w_color('({})'.format(index), BColors.BOLD), folder)) for index, folder in
+     enumerate(sub_folders)]
+    print('')
+
     while True:
-        l_folder = input(w_color('Specify folder which your function live: ', BColors.BOLD))
+        l_folder_raw = input(w_color('Specify folder index (or name) which your function live: ', BColors.BOLD))
+
+        try:
+            l_folder_index = int(l_folder_raw)
+            l_folder = sub_folders[l_folder_index]
+        except Exception as e:
+            l_folder = l_folder_raw
+
         full_path = '{}/lambda/{}'.format(os.getcwd(), l_folder)
         if Path(full_path).exists() and Path(full_path).is_dir():
             break
@@ -150,33 +182,78 @@ def user_input_env(is_build=False):
         set_env('LAMBDA_FUNCTION_NAME', l_fname)
 
 
+def op_docker_down():
+    op_print('Reset all docker-compose images')
+    p = subprocess.Popen(['docker-compose down --rmi all'], stdout=subprocess.PIPE,
+                         stderr=subprocess.STDOUT, shell=True, env=sys_env)
+
+    print_process(p)
+
+
 def op_install_local():
-    pass
+    op_print('Scan all requirements...')
+    sub_folders = [f.name for f in os.scandir('{}/lambda/'.format(os.getcwd())) if f.is_dir()]
+
+    reqs = []
+    for folder in sub_folders:
+        req_path = '{}/lambda/{}/requirements.txt'.format(os.getcwd(), folder)
+        if Path(req_path).exists():
+            with open(req_path) as req:
+                e_reqs = req.read().splitlines()
+                reqs.extend(e_reqs)
+
+    if len(reqs):
+        op_print('Install all dependencies for local development...')
+        p = subprocess.Popen(['pip install --upgrade {}'.format(' '.join(reqs))], stdout=subprocess.PIPE,
+                             stderr=subprocess.STDOUT, shell=True, env=sys_env)
+
+        print_process(p)
+
+    op_print('Done install requirements...')
 
 
 def op_test():
-    run_w_rollback(cp_venv)
     run_w_rollback(user_input_env)
+    run_w_rollback(cp_lfunc)
 
     try:
+        op_print('Run dependencies installer...')
+        p = subprocess.Popen(['docker-compose up install'], stdout=subprocess.PIPE,
+                             stderr=subprocess.STDOUT, shell=True, env=sys_env)
+
+        print_process(p)
+
         op_print('Run docker-lambda on test environment...')
         p = subprocess.Popen(['docker-compose up test'], stdout=subprocess.PIPE,
                              stderr=subprocess.STDOUT, shell=True, env=sys_env)
 
         print_process(p)
 
-        op_print('Reset all docker-compose images')
-        p = subprocess.Popen(['docker-compose down --rmi all'], stdout=subprocess.PIPE,
+    finally:
+        op_docker_down()
+        rollback()
+
+
+def op_build():
+    run_w_rollback(user_input_env, is_build=True)
+    run_w_rollback(cp_lfunc)
+
+    try:
+        op_print('Run dependencies installer...')
+        p = subprocess.Popen(['docker-compose up install'], stdout=subprocess.PIPE,
+                             stderr=subprocess.STDOUT, shell=True, env=sys_env)
+
+        print_process(p)
+
+        op_print('Run docker-lambda build and deploy to AWS')
+        p = subprocess.Popen(['docker-compose up build'], stdout=subprocess.PIPE,
                              stderr=subprocess.STDOUT, shell=True, env=sys_env)
 
         print_process(p)
 
     finally:
+        op_docker_down()
         rollback()
-
-
-def op_build():
-    pass
 
 
 def run():

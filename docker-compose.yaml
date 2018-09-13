@@ -1,21 +1,25 @@
 version: '3.4'
 services:
 
+  install:
+    build:
+      context: ./
+      dockerfile: docker/dependencies/Dockerfile
+    volumes:
+    - ./tmp:/home/app/projects
+
   test:
     image: lambci/lambda:python3.6
     volumes:
-    - .:/var/task
-    - $PWD/tmp:/var/task
-    - $PWD/lambda/$FUNCTION_FOLDER:/var/task
-    command: ls -lh
-    entrypoint: /bin/bash -c
+    - ./tmp:/var/task
+    command: $LAMBDA_MODULE $TEST_EVENT
 
   build:
     build:
       context: ./
-      dockerfile: Dockerfile
+      dockerfile: docker/deploy/Dockerfile
     volumes:
-    - $PWD/lambda/$FUNCTION_FOLDER:/var/task
+    - ./tmp:/var/task
     container_name: $LAMBDA_MODULE
     environment:
     - AWS_ACCOUNT_ID=$AWS_ACCOUNT_ID

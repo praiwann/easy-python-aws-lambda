@@ -38,6 +38,16 @@ You will see 3 options available if pass python and virtualenv prerequisite chec
 
 After choose the option... follow the step to proceed and that's it.
 
+### Environments
+The project include of two .env files
+```
+test-lambda.env
+aws.env
+```
+**aws.env** - Use for defined a docker AWS environment variable while doing the test. All env reference to [docker-lambda][4] -> Documentation -> Env vars.
+
+**test-lambda.env** - Use for inject an additional env of Lambda when **_running test on local_** ([AWS Environment][7]).
+
 [pyenv]: https://github.com/pyenv/pyenv
 [0]: https://github.com/pypa/virtualenv
 [1]: https://github.com/pyenv/pyenv-virtualenv
@@ -46,3 +56,4 @@ After choose the option... follow the step to proceed and that's it.
 [4]: https://github.com/lambci/docker-lambda
 [5]: https://github.com/RealSalmon/docker-amazonlinux-python
 [6]: https://docs.aws.amazon.com/lambda/latest/dg/limits.html
+[7]: https://docs.aws.amazon.com/lambda/latest/dg/env_variables.html

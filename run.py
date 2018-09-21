@@ -41,6 +41,9 @@ class BColors:
     ORANGE = '\033[0;33m'
 
 
+temp_envs = [PrivateEnv.COMPRESS_FILE_NAME, UserDefinedEnv.LAMBDA_MODULE, UserDefinedEnv.LAMBDA_FUNCTION_NAME,
+             UserDefinedEnv.FUNCTION_FOLDER]
+
 prerequisites = [(r'docker-compose', r'docker-compose version (.*),', r'regex', r'1.9'),
                  (r'virtualenv', r'_is_venv', r'function'), ]
 
@@ -125,6 +128,15 @@ def _check_aws_env():
     return is_set
 
 
+def _make_temp_env():
+    op_print('Making temporary env file')
+    with open('temp.env', 'w+') as f:
+        for temp_env in temp_envs:
+            f.write('{}={}\n'.format(temp_env, sys_env.get(temp_env)))
+
+    op_print('Done making temporary file')
+
+
 def _print_process(p):
     for line in iter(p.stdout.readline, b''):
         print(w_color('>>> ', BColors.BOLD) + line.rstrip().decode('utf-8'))
@@ -138,7 +150,8 @@ def _rollback():
     op_print('Rollback process...')
 
     op_print('Reset tmp folder')
-    _run_subprocess('rm -rf ./tmp && rm requirements.txt')
+    _run_subprocess('rm -rf ./tmp && rm ./requirements.txt')
+    _run_subprocess('rm ./temp.env')
     op_print('Done rollback ;)')
 
 
@@ -274,6 +287,7 @@ def _op_test():
     _run_w_rollback(_mk_dir)
     _run_w_rollback(_cp_lfunc)
     _run_w_rollback(_read_test_event)
+    _run_w_rollback(_make_temp_env)
 
     try:
         op_print('Run dependencies installer...')
@@ -300,6 +314,7 @@ def _op_build():
     _run_w_rollback(_mk_dir)
     _run_w_rollback(_cp_lfunc)
     _run_w_rollback(_cp_ignore)
+    _run_w_rollback(_make_temp_env)
 
     try:
         ts = int(time.time())

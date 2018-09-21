@@ -13,6 +13,10 @@ services:
     volumes:
     - ./tmp:/var/task
     command: $LAMBDA_MODULE $TEST_EVENT
+    env_file:
+    - temp.env
+    - aws.env
+    - test-lambda.env
 
   build:
     build:
@@ -21,12 +25,6 @@ services:
     volumes:
     - ./tmp:/var/task
     container_name: $LAMBDA_MODULE
-    environment:
-    - AWS_ACCOUNT_ID=$AWS_ACCOUNT_ID
-    - AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-    - AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
-    - AWS_REGION=$AWS_REGION
-    - EXE_MODULE=$LAMBDA_MODULE
-    - FUNCTION_NAME=$LAMBDA_FUNCTION_NAME
-    - COMPRESS_FILE_NAME=$COMPRESS_FILE_NAME
-    - AWS_S3_LAMBDA_BUCKET=$AWS_S3_LAMBDA_BUCKET
+    env_file:
+    - temp.env
+    - aws.env

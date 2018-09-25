@@ -261,6 +261,17 @@ def _op_docker_down():
 
 
 def _op_install_local():
+    while True:
+        use_cache = input(w_color('Use cache?: (y/n) ', BColors.BOLD))
+
+        pattern = '^[y,n,Y,N].*$'
+        p = re.compile(pattern)
+        if p.match(use_cache):
+            is_use_cache = True if use_cache.upper() == 'Y' else False
+            break
+        else:
+            print('Choose one please!!')
+
     op_print('Scan all requirements...')
     sub_folders = [f.name for f in os.scandir('{}/lambda/'.format(os.getcwd())) if f.is_dir()]
 
@@ -275,7 +286,8 @@ def _op_install_local():
     reqs = list(set(reqs))
     if len(reqs):
         op_print('Install all dependencies for local development...')
-        p = _create_subprocess_popen('pip install --upgrade {}'.format(' '.join(reqs)))
+        p = _create_subprocess_popen('pip install --upgrade {} {}'.format(' '.join(reqs),
+                                                                          '' if is_use_cache else '--no-cache-dir'))
 
         _print_process(p)
 

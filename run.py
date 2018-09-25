@@ -206,7 +206,7 @@ def _read_test_event():
 
     if json_data:
         try:
-            sys_env[PrivateEnv.TEST_EVENT] = '\'{}\''.format(json.dumps(json.dumps(json.loads(json_data))))
+            sys_env[PrivateEnv.TEST_EVENT] = '{}'.format(json.dumps(json.dumps(json.loads(json_data))))
         except Exception as e:
             print(w_color('Contents error in event.json format', BColors.WARNING))
 

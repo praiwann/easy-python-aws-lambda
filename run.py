@@ -322,6 +322,10 @@ def _op_build():
         print(w_color('Some required ENV not set in bash_profile or local environment, please check', BColors.FAIL))
         return
 
+    ts = int(time.time())
+    file_name = sys_env[UserDefinedEnv.LAMBDA_FUNCTION_NAME] + '_' + str(ts)
+    sys_env[PrivateEnv.COMPRESS_FILE_NAME] = file_name
+
     _run_w_rollback(_user_input_env, is_build=True)
     _run_w_rollback(_mk_dir)
     _run_w_rollback(_cp_lfunc)
@@ -329,10 +333,6 @@ def _op_build():
     _run_w_rollback(_make_temp_env)
 
     try:
-        ts = int(time.time())
-        file_name = sys_env[UserDefinedEnv.LAMBDA_FUNCTION_NAME] + '_' + str(ts)
-        sys_env[PrivateEnv.COMPRESS_FILE_NAME] = file_name
-
         op_print('Run dependencies installer...')
         p = _create_subprocess_popen('docker-compose up install')
 
